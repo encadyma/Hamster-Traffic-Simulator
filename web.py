@@ -73,7 +73,7 @@ class RobotBehaviorState:
 
 
 class WebServer:
-    def __init__(self):
+    def __init__(self, max_robot_num):
         self.comm = None
         self.server = None
         self.s_thread = None
@@ -83,7 +83,7 @@ class WebServer:
         self.robot_list = {}
 
         self.robot_num = 0
-        self.max_robot_num = 1  # Complete maximum that the API can handle is 8
+        self.max_robot_num = max_robot_num  # Complete maximum that the API can handle is 8
 
         self.frame = tk.Tk()
 
@@ -251,8 +251,11 @@ class WebServer:
 
 
 def start():
-    ws = WebServer()
+    max_robot_num = 1
+    ws = WebServer(max_robot_num)
     ws.start_server()
+
+    #ws.get_wheel(0, robot_num=0)
 
     while True:
         pass
