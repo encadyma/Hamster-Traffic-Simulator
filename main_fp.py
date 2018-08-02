@@ -11,9 +11,10 @@ Basic components:
 '''
 
 from graph_with_edge_cost import *
+from web.py import *
 import time
 import threading
-from comm_ble import RobotComm
+from HamsterAPI.comm_ble import RobotComm
 import Tkinter as tk
 #from GUI_fp import *
 import Queue as que
@@ -34,10 +35,26 @@ class Graph:
         self.startNode = None
         self.goalNode = None
         self.queue = Queue.PriorityQueue()
+
+class WebServer:
+    def __init__(self, max_robot_num):
+    def get_proximity(self, prox_num, robot_num = None, robot_id = None):
+    def get_floor(self, floor_num, robot_num = None, robot_id = None):
+    def get_led(self, led_num, robot_num = None, robot_id = None):
+    def get_wheel(self, motor_num, robot_num = None, robot_id = None):
+    def set_wheel(self, motor_num, speed, robot_num = None, robot_id = None):
+    def set_led(self, led_num, led_color, robot_num = None, robot_id = None):
 '''
+
+
 
 #robot_go = False
 #robot_quit = False
+
+
+#Two lists to store robots info for cross-functional communication
+currentRobotState = []
+currentRobotPosition = []
 
 class Event(object):
     def __init__(self, event_type, event_data):
@@ -90,7 +107,7 @@ class FSM(object):
         return
 
 class Motion_control():
-	def __init__(self, robotList):
+	def __init__(self, robotList, ws_handle): #ws_handle ==> give access to the web server class, a layer on raw hamster API
         self.robotList = robotList
         self.q = que.Queue()
 
@@ -111,37 +128,75 @@ class Motion_control():
         sm_thread.setDaemon(True)
         sm_thread.start()
 
+    # This methods runs in a separate thread, oversees the states of each robot and coordinate their
+    # motions when necessary
+
+    def head_coordinator(self):
+
     def setMachine(self):
-        self.sm.add_state("TurningLeft", "obsLeft", self.turning_left, "TurningLeft")
+        self.sm.add_state("Straightforward", "lineLeft", self.TurningRight, "TurningRight")
+        self.sm.add_state("Straightforward", "lineRight", self.TurningLeft, "TurningLeft")
+
+        self.sm.add_state("Straightforward", "obs", self.DecreaseSpeed, "SeeingObs")
+        self.sm.add_state("Straightforward", "free", self.GoingForward, "Straightforward")
+
+        self.sm.add_state("SeeingObs", "obs", self.DecreaseSpeed, "SeeingObs")
+        self.sm.add_state("SeeingObs", "free", self.BackToNormal, "Straightforward")
+
+        self.sm.add_state("TurningLeft", "no_floor", self.BackToNormal, "Straightforward")
+        self.sm.add_state("TurningLeft", "lineRight", self.TurningLeft, "TurningLeft")
+        self.sm.add_state("TurningRight", "no_floor", self.BackToNormal, "Straightforward")
+        self.sm.add_state("TurningRight", "lineLeft", self.TurningRight, "TurningRight")
+
+        self.sm.add_state("")
+
+
+        self.sm.addStartState("Straightforward")
+        self.sm.addEndState("")
 
     def event_watcher(self):
         q = self.q
 
+        while not self.quit and self.go:
+            for robot in self.robotList:
+
+
+    ########motion control part############
+
+    # rob_num is the id of the robot that we are controlling
+    def BackToNormal(self, rob_num):
+        if self.quit:
+            return
+        wheel_l = 
+        wheel_r = 
+
+    def GoingForward(self, rob_num):
+        if self.quit:
+            return
         
+
+
+
+
 
 
 def main():
 	robot_num = 1 # max number of robots to control
-	gMaxRobotNum = robot_num 
-    comm = RobotComm(gMaxRobotNum)
-    comm.start()
+    ws_handle = WebServer(robot_num)
+    ws_handle.start_server()
 
     #The comm thread is actively searching for connections
     print 'Bluetooth starts'
     robotList = comm.robotList
 
     #print robotList
-    robot_handle = Motion_control(robotList)
+    robot_handle = Motion_control(robotList, ws_handle)
     #print type(robotList)
 
     m = tk.Tk() #root
     gui = GUI(m, robot_handle)
 
     m.mainloop()
-
-    comm.stop()
-    comm.join()
-
 
 if __name__ == "__main__":
 	main()

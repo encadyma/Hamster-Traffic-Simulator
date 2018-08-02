@@ -26,7 +26,7 @@ class RobotEnum(object):
 class RobotBehaviorState:
     def __init__(self, robot):
         self._robot = robot
-        self.left_motor = 0
+        self.left_motor = 0 #stores the motors' speeds
         self.right_motor = 0
 
         self.left_led = 0
@@ -135,6 +135,7 @@ class WebServer:
             kwargs={'debug': True, 'use_reloader': False}
         )
         self.s_thread.setDaemon(True)
+        #This thread keeps an eye on which robots are connected and disconnected
         self.ul_thread = Thread(name='list watcher', target=self.update_robot_list)
         self.ul_thread.setDaemon(True)
 
@@ -220,7 +221,7 @@ class WebServer:
     def get_robot_id(self, robot_num):
         return str(id(self.robot_list[robot_num]))
 
-    def update_robot_list(self):
+    def update_robot_list(self):#runs in a separate thread
         while True:
             if self.robot_num != len(self.robot_list_raw):
                 logging.info('[new change to robot list]')
