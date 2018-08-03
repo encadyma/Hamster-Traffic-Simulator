@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, json
+from flask_cors import CORS
 from HamsterAPI.comm_ble import RobotComm
 import time
 import sys
@@ -26,7 +27,7 @@ class RobotEnum(object):
 class RobotBehaviorState:
     def __init__(self, robot):
         self._robot = robot
-        self.left_motor = 0 #stores the motors' speeds
+        self.left_motor = 0
         self.right_motor = 0
 
         self.left_led = 0
@@ -63,6 +64,13 @@ class RobotBehaviorState:
             "id": str(id(self._robot)),
             "left_motor": self.left_motor,
             "right_motor": self.right_motor,
+            "left_led": self.left_led,
+            "right_led": self.right_led,
+            "left_floor": self._robot.get_floor(0),
+            "right_floor": self._robot.get_floor(1),
+            "left_proximity": self._robot.get_proximity(0),
+            "right_proximity": self._robot.get_proximity(1),
+            "musical_note": self.musical_note,
             "creation_time": self.creation_time,
             "is_active": self.active,
             "tick": self.tick
@@ -73,7 +81,7 @@ class RobotBehaviorState:
 
 
 class WebServer:
-    def __init__(self, max_robot_num):
+    def __init__(self):
         self.comm = None
         self.server = None
         self.s_thread = None
@@ -83,7 +91,7 @@ class WebServer:
         self.robot_list = {}
 
         self.robot_num = 0
-        self.max_robot_num = max_robot_num  # Complete maximum that the API can handle is 8
+        self.max_robot_num = 1  # Complete maximum that the API can handle is 8
 
         self.frame = tk.Tk()
 
@@ -98,6 +106,8 @@ class WebServer:
     def init_server(self):
         self.comm = RobotComm(self.max_robot_num)
         self.server = Flask(__name__)
+
+        CORS(self.server)
 
         @self.server.route('/')
         def ws_status():
@@ -117,9 +127,14 @@ class WebServer:
                 self.set_wheel(0, int(cmds[1]), robot_id=robot_id)
             elif cmds[0] == 'r_motor':
                 self.set_wheel(1, int(cmds[1]), robot_id=robot_id)
+            elif cmds[0] == 'a_motor':
+                self.set_wheel(0, int(cmds[1]), robot_id=robot_id)
+                self.set_wheel(1, int(cmds[1]), robot_id=robot_id)
             elif cmds[0] == 'e_stop':
                 self.set_wheel(0, 0, robot_id=robot_id)
                 self.set_wheel(1, 0, robot_id=robot_id)
+            elif cmds[0] == 't_tone':
+                self.set_musical_note(int(cmds[1]), robot_id=robot_id)
             else:
                 return jsonify({'online': True, 'success': False, 'error': 'cmd_not_found', 'cmd_path': cmds})
 
@@ -135,7 +150,6 @@ class WebServer:
             kwargs={'debug': True, 'use_reloader': False}
         )
         self.s_thread.setDaemon(True)
-        #This thread keeps an eye on which robots are connected and disconnected
         self.ul_thread = Thread(name='list watcher', target=self.update_robot_list)
         self.ul_thread.setDaemon(True)
 
@@ -182,6 +196,11 @@ class WebServer:
         elif motor_num == RobotEnum.RIGHT_SIDE:
             self.robot_list[r_id].right_motor = speed
 
+    def set_musical_note(self, note, robot_num = None, robot_id = None):
+        r_id = robot_id if robot_id else self.get_robot_id(robot_num)
+
+        self.robot_list[r_id].musical_note = note
+
     def set_led(self, led_num, led_color, robot_num = None, robot_id = None):
         r_id = robot_id if robot_id else self.get_robot_id(robot_num)
 
@@ -221,7 +240,7 @@ class WebServer:
     def get_robot_id(self, robot_num):
         return str(id(self.robot_list[robot_num]))
 
-    def update_robot_list(self):#runs in a separate thread
+    def update_robot_list(self):
         while True:
             if self.robot_num != len(self.robot_list_raw):
                 logging.info('[new change to robot list]')
@@ -252,11 +271,8 @@ class WebServer:
 
 
 def start():
-    max_robot_num = 1
-    ws = WebServer(max_robot_num)
+    ws = WebServer()
     ws.start_server()
-
-    #ws.get_wheel(0, robot_num=0)
 
     while True:
         pass
